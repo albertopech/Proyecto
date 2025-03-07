@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List App</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .counter {
+            font-size: 0.7em;
+            background: #3498db;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            align-self: center;
+        }
+        .task-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        .task-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+        }
+        .task-id {
+            color: #7f8c8d;
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 30px;
+        }
+        .task-text {
+            flex-grow: 1;
+        }
+        .task-item.completed .task-text {
+            text-decoration: line-through;
+            color: #95a5a6;
+        }
+        .task-complete {
+            margin-right: 15px;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .new-task {
+            display: flex;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .new-task input {
+            flex-grow: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+            font-size: 14px;
+        }
+        .new-task button {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+        }
+        .new-task button:hover {
+            background-color: #27ae60;
+        }
+        #console-output {
+            margin-top: 20px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .console-line {
+            margin: 0;
+            padding: 2px 0;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            margin-right: 5px;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background-color: white;
+            border-color: #ddd;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #message {
+            padding: 15px;
+            background-color: #f8d7da;
+            color: #721c24;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="appTitle">Todo List App</h1>
+        
+        <div id="message"></div>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="app">Aplicación</div>
+            <div class="tab" data-tab="console">Consola</div>
+        </div>
+        
+        <div id="appTab" class="tab-content active">
+            <div class="new-task">
+                <input type="text" id="taskInput" placeholder="Añadir nueva tarea...">
+                <button id="addTask">Añadir</button>
+            </div>
+            
+            <ul id="taskList" class="task-list">
+                <!-- Las tareas se cargarán aquí -->
+            </ul>
+            
+            <div class="controls">
+                <button id="removeCompleted" class="btn btn-danger">Eliminar completadas</button>
+                <button id="toggleCompleted" class="btn btn-primary">Mostrar/Ocultar completadas</button>
+            </div>
+        </div>
+        
+        <div id="consoleTab" class="tab-content">
+            <div id="console-output">
+                <!-- Salida de consola simulada -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Script que actúa como puente entre la aplicación web y Node.js -->
+    <script>
+        // Configuración para la conexión a tu aplicación Node.js
+        let showCompleted = true;
+        
+        // Redireccionar console.log a nuestra UI
+        const originalConsoleLog = console.log;
+        const originalConsoleClear = console.clear;
+        
+        console.log = function(message) {
+            originalConsoleLog.apply(console, arguments);
+            logToUI(message);
+        };
+        
+        console.clear = function() {
+            originalConsoleClear.apply(console);
+            clearConsole();
+        };
+        
+        function logToUI(message) {
+            const consoleOutput = document.getElementById('console-output');
+            const line = document.createElement('p');
+            line.className = 'console-line';
+            line.textContent = message;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        function clearConsole() {
+            const consoleOutput = document.getElementById('console-output');
+            consoleOutput.innerHTML = '';
+        }
+        
+        function showMessage(text, isError = false) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.style.display = 'block';
+            
+            if (isError) {
+                messageEl.style.backgroundColor = '#f8d7da';
+                messageEl.style.color = '#721c24';
+            } else {
+                messageEl.style.backgroundColor = '#d4edda';
+                messageEl.style.color = '#155724';
+            }
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Inicializar la UI
+        document.addEventListener('DOMContentLoaded', function() {
+            // Configurar la navegación por pestañas
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+                });
+            });
+            
+            // Crear un iframe invisible para cargar el script Node.js
+            const bridge = document.createElement('iframe');
+            bridge.style.display = 'none';
+            bridge.src = 'puente.html';
+            document.body.appendChild(bridge);
+            
+            // Esperar mensajes del iframe para recibir la colección de tareas
+            window.addEventListener('message', function(event) {
+                if (event.data.type === 'collection') {
+                    // Recibimos la colección, ahora renderizamos la UI
+                    updateUI(event.data.collection);
+                } else if (event.data.type === 'error') {
+                    showMessage(event.data.message, true);
+                } else if (event.data.type === 'console') {
+                    // Recibimos un mensaje para la consola
+                    logToUI(event.data.message);
+                } else if (event.data.type === 'clearConsole') {
+                    // Limpiar la consola
+                    clearConsole();
+                }
+            });
+            
+            // Configurar controladores de eventos para la interacción del usuario
+            document.getElementById('addTask').addEventListener('click', addTask);
+            document.getElementById('taskInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    addTask();
+                }
+            });
+            
+            document.getElementById('removeCompleted').addEventListener('click', function() {
+                bridge.contentWindow.postMessage({action: 'removeComplete'}, '*');
+            });
+            
+            document.getElementById('toggleCompleted').addEventListener('click', function() {
+                showCompleted = !showCompleted;
+                bridge.contentWindow.postMessage({action: 'toggle', showCompleted}, '*');
+            });
+        });
+        
+        // Función para añadir una nueva tarea
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const task = input.value.trim();
+            
+            if (task) {
+                // Enviar mensaje al iframe para añadir la tarea
+                const bridge = document.querySelector('iframe');
+                bridge.contentWindow.postMessage({action: 'addTask', task}, '*');
+                
+                // Limpiar el campo de entrada
+                input.value = '';
+            }
+        }
+        
+        // Función para actualizar la UI con los datos recibidos
+        function updateUI(collection) {
+            // Actualizar el título
+            document.getElementById('appTitle').innerHTML = 
+                `${collection.userName}'s Todo List <span class="counter">${collection.incomplete} pendientes</span>`;
+            
+            // Actualizar la lista de tareas
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = '';
+            
+            collection.items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = `task-item ${item.complete ? 'completed' : ''}`;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'task-complete';
+                checkbox.checked = item.complete;
+                checkbox.dataset.id = item.id;
+                checkbox.addEventListener('change', function() {
+                    const bridge = document.querySelector('iframe');
+                    bridge.contentWindow.postMessage({
+                        action: 'markComplete', 
+                        id: this.dataset.id,
+                        complete: this.checked
+                    }, '*');
+                });
+                
+                const idSpan = document.createElement('span');
+                idSpan.className = 'task-id';
+                idSpan.textContent = item.id;
+                
+                const textSpan = document.createElement('span');
+                textSpan.className = 'task-text';
+                textSpan.textContent = item.task;
+                
+                li.appendChild(checkbox);
+                li.appendChild(idSpan);
+                li.appendChild(textSpan);
+                
+                taskList.appendChild(li);
+            });
+        }
+    </script>
+</body>
+</html>

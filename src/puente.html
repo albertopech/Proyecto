@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node.js Bridge</title>
+    <script>
+        // Esta página funciona como un puente entre la interfaz web y tu código Node.js
+        
+        // Simulamos las clases de tu aplicación
+        class TodoItem {
+            constructor(id, task, complete = false) {
+                this.id = id;
+                this.task = task;
+                this.complete = complete;
+            }
+            
+            printDetails() {
+                const message = `${this.id}\t${this.task} ${this.complete ? "\t(complete)" : ""}`;
+                logConsole(message);
+                return message;
+            }
+        }
+        
+        class TodoCollection {
+            constructor(userName, todoItems = []) {
+                this.userName = userName;
+                this.nextId = 1;
+                this.itemMap = new Map();
+                
+                todoItems.forEach(item => this.itemMap.set(item.id, item));
+            }
+            
+            addTodo(task) {
+                while (this.getTodoById(this.nextId)) {
+                    this.nextId++;
+                }
+                this.itemMap.set(this.nextId, new TodoItem(this.nextId, task));
+                return this.nextId;
+            }
+            
+            getTodoById(id) {
+                return this.itemMap.get(Number(id));
+            }
+            
+            getTodoItems(includeComplete) {
+                return [...this.itemMap.values()]
+                    .filter(item => includeComplete || !item.complete);
+            }
+            
+            markComplete(id, complete) {
+                const todoItem = this.getTodoById(id);
+                if (todoItem) {
+                    todoItem.complete = complete;
+                }
+            }
+            
+            removeComplete() {
+                this.itemMap.forEach(item => {
+                    if (item.complete) {
+                        this.itemMap.delete(item.id);
+                    }
+                });
+            }
+            
+            getItemCounts() {
+                return {
+                    total: this.itemMap.size,
+                    incomplete: this.getTodoItems(false).length
+                };
+            }
+        }
+        
+        // Crear los datos iniciales (como en tu index.ts original)
+        const todos = [
+            new TodoItem(1, "Buy Flowers"), 
+            new TodoItem(2, "Get Shoes"),
+            new TodoItem(3, "Collect Tickets"), 
+            new TodoItem(4, "Call Joe", true)
+        ];
+        
+        // Crear la colección
+        const collection = new TodoCollection("Adam", todos);
+        
+        // Variable para controlar la visualización de tareas completadas
+        let showCompleted = true;
+        
+        // Función para enviar un mensaje de consola a la página principal
+        function logConsole(message) {
+            parent.postMessage({
+                type: 'console',
+                message: message
+            }, '*');
+        }
+        
+        // Función para limpiar la consola en la página principal
+        function clearConsole() {
+            parent.postMessage({
+                type: 'clearConsole'
+            }, '*');
+        }
+        
+        // Función para enviar el estado actual de la colección a la página principal
+        function sendCollectionData() {
+            // Preparar los datos en un formato más simple para enviarlos
+            const items = collection.getTodoItems(showCompleted).map(item => ({
+                id: item.id,
+                task: item.task,
+                complete: item.complete
+            }));
+            
+            // Enviar los datos a la página principal
+            parent.postMessage({
+                type: 'collection',
+                collection: {
+                    userName: collection.userName,
+                    incomplete: collection.getItemCounts().incomplete,
+                    items: items
+                }
+            }, '*');
+        }
+        
+        // Función para actualizar la consola con el estado actual
+        function updateConsoleOutput() {
+            // Limpiar la consola
+            clearConsole();
+            
+            // Mostrar el encabezado
+            logConsole(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+            
+            // Mostrar cada tarea
+            collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+        }
+        
+        // Escuchar mensajes de la página principal
+        window.addEventListener('message', function(event) {
+            try {
+                switch(event.data.action) {
+                    case 'addTask':
+                        const newId = collection.addTodo(event.data.task);
+                        clearConsole();
+                        logConsole(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+                        logConsole(`Added task: ${event.data.task} with ID: ${newId}`);
+                        collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+                        break;
+                    
+                    case 'markComplete':
+                        collection.markComplete(event.data.id, event.data.complete);
+                        clearConsole();
+                        logConsole(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+                        logConsole(`Task ${event.data.id} marked as ${event.data.complete ? 'complete' : 'incomplete'}`);
+                        collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+                        break;
+                    
+                    case 'removeComplete':
+                        collection.removeComplete();
+                        clearConsole();
+                        logConsole(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+                        logConsole(`Removed completed tasks`);
+                        collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+                        break;
+                    
+                    case 'toggle':
+                        showCompleted = event.data.showCompleted;
+                        clearConsole();
+                        logConsole(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+                        logConsole(`${showCompleted ? 'Showing' : 'Hiding'} completed tasks`);
+                        collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+                        break;
+                    
+                    default:
+                        throw new Error('Acción desconocida: ' + event.data.action);
+                }
+                
+                // Enviar los datos actualizados después de cada acción
+                sendCollectionData();
+            } catch (error) {
+                parent.postMessage({
+                    type: 'error',
+                    message: 'Error: ' + error.message
+                }, '*');
+            }
+        });
+        
+        // Enviar los datos iniciales al cargar
+        window.addEventListener('load', function() {
+            sendCollectionData();
+            updateConsoleOutput();
+        });
+    </script>
+</head>
+<body>
+    <!-- Este archivo solo sirve como puente, no tiene contenido visible -->
+</body>
+</html>
