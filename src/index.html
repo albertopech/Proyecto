@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .task-list {
+            list-style: none;
+            padding: 0;
+        }
+        .task-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+        }
+        .task-id {
+            margin-right: 10px;
+            min-width: 20px;
+        }
+        .task-item.completed .task-text {
+            text-decoration: line-through;
+            color: #777;
+        }
+        .task-complete {
+            margin-right: 10px;
+        }
+        button {
+            margin: 5px;
+            padding: 5px 10px;
+        }
+        .new-task {
+            margin: 10px 0;
+            display: flex;
+        }
+        .new-task input {
+            flex-grow: 1;
+            margin-right: 5px;
+            padding: 5px;
+        }
+        #console-output {
+            margin-top: 10px;
+            background-color: #f5f5f5;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+        .tab {
+            display: inline-block;
+            padding: 5px 10px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #eee;
+        }
+        .tab-content {
+            display: none;
+            padding: 10px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #message {
+            padding: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="appTitle">Todo List</h1>
+        
+        <div id="message"></div>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="app">App</div>
+            <div class="tab" data-tab="console">Console</div>
+        </div>
+        
+        <div id="appTab" class="tab-content active">
+            <div class="new-task">
+                <input type="text" id="taskInput" placeholder="Add new task...">
+                <button id="addTask">Add</button>
+            </div>
+            
+            <ul id="taskList" class="task-list"></ul>
+            
+            <div class="controls">
+                <button id="removeCompleted">Remove completed</button>
+                <button id="toggleCompleted">Show/Hide completed</button>
+            </div>
+        </div>
+        
+        <div id="consoleTab" class="tab-content">
+            <div id="console-output"></div>
+        </div>
+    </div>
+
+    <script>
+        // TodoItem class for managing individual todo items
+        class TodoItem {
+            constructor(id, task, complete = false) {
+                this.id = id;
+                this.task = task;
+                this.complete = complete;
+            }
+            
+            printDetails() {
+                const message = `${this.id}\t${this.task} ${this.complete ? "\t(complete)" : ""}`;
+                logToUI(message);
+                return message;
+            }
+        }
+        
+        // TodoCollection class for managing the collection of todo items
+        class TodoCollection {
+            constructor(userName, todoItems = []) {
+                this.userName = userName;
+                this.nextId = 1;
+                this.itemMap = new Map();
+                
+                todoItems.forEach(item => this.itemMap.set(item.id, item));
+            }
+            
+            addTodo(task) {
+                while (this.getTodoById(this.nextId)) {
+                    this.nextId++;
+                }
+                this.itemMap.set(this.nextId, new TodoItem(this.nextId, task));
+                return this.nextId;
+            }
+            
+            getTodoById(id) {
+                return this.itemMap.get(Number(id));
+            }
+            
+            getTodoItems(includeComplete) {
+                return [...this.itemMap.values()]
+                    .filter(item => includeComplete || !item.complete);
+            }
+            
+            markComplete(id, complete) {
+                const todoItem = this.getTodoById(id);
+                if (todoItem) {
+                    todoItem.complete = complete;
+                }
+            }
+            
+            removeComplete() {
+                this.itemMap.forEach((item, id) => {
+                    if (item.complete) {
+                        this.itemMap.delete(id);
+                    }
+                });
+            }
+            
+            getItemCounts() {
+                return {
+                    total: this.itemMap.size,
+                    incomplete: this.getTodoItems(false).length
+                };
+            }
+        }
+        
+        // Create initial data
+        const todos = [
+            new TodoItem(1, "Buy Flowers"), 
+            new TodoItem(2, "Get Shoes"),
+            new TodoItem(3, "Collect Tickets"), 
+            new TodoItem(4, "Call Joe", true)
+        ];
+        
+        // Create the collection
+        const collection = new TodoCollection("Adam", todos);
+        
+        // Variable to control display of completed tasks
+        let showCompleted = true;
+        
+        // UI management functions
+        function logToUI(message) {
+            const consoleOutput = document.getElementById('console-output');
+            const line = document.createElement('p');
+            line.style.margin = "2px 0";
+            line.textContent = message;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = '';
+        }
+        
+        function showMessage(text, isError = false) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.style.display = 'block';
+            messageEl.style.backgroundColor = isError ? '#ffdddd' : '#ddffdd';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Function to update the console output
+        function updateConsoleOutput() {
+            clearConsole();
+            logToUI(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+            collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+        }
+        
+        // Function to update the UI with the current collection data
+        function updateUI() {
+            // Update the title with item count
+            document.getElementById('appTitle').textContent = 
+                `${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} pending)`;
+            
+            // Update the task list
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = '';
+            
+            collection.getTodoItems(showCompleted).forEach(item => {
+                const li = document.createElement('li');
+                li.className = `task-item ${item.complete ? 'completed' : ''}`;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'task-complete';
+                checkbox.checked = item.complete;
+                checkbox.dataset.id = item.id;
+                checkbox.addEventListener('change', function() {
+                    const id = parseInt(this.dataset.id);
+                    markComplete(id, this.checked);
+                });
+                
+                const idSpan = document.createElement('span');
+                idSpan.className = 'task-id';
+                idSpan.textContent = item.id;
+                
+                const textSpan = document.createElement('span');
+                textSpan.className = 'task-text';
+                textSpan.textContent = item.task;
+                
+                li.appendChild(checkbox);
+                li.appendChild(idSpan);
+                li.appendChild(textSpan);
+                
+                taskList.appendChild(li);
+            });
+        }
+        
+        // Task management functions
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const task = input.value.trim();
+            
+            if (task) {
+                const newId = collection.addTodo(task);
+                
+                clearConsole();
+                logToUI(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+                logToUI(`Added task: ${task} with ID: ${newId}`);
+                collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+                
+                // Clear the input field
+                input.value = '';
+                
+                // Update the UI
+                updateUI();
+            }
+        }
+        
+        function markComplete(id, complete) {
+            collection.markComplete(id, complete);
+            
+            clearConsole();
+            logToUI(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+            logToUI(`Task ${id} marked as ${complete ? 'complete' : 'incomplete'}`);
+            collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+            
+            // Update the UI
+            updateUI();
+        }
+        
+        function removeCompleted() {
+            collection.removeComplete();
+            
+            clearConsole();
+            logToUI(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+            logToUI(`Removed completed tasks`);
+            collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+            
+            // Update the UI
+            updateUI();
+        }
+        
+        function toggleCompleted() {
+            showCompleted = !showCompleted;
+            
+            clearConsole();
+            logToUI(`${collection.userName}'s Todo List (${collection.getItemCounts().incomplete} items to do)`);
+            logToUI(`${showCompleted ? 'Showing' : 'Hiding'} completed tasks`);
+            collection.getTodoItems(showCompleted).forEach(item => item.printDetails());
+            
+            // Update the UI
+            updateUI();
+        }
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup tab navigation
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+                });
+            });
+            
+            // Setup event handlers
+            document.getElementById('addTask').addEventListener('click', addTask);
+            document.getElementById('taskInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    addTask();
+                }
+            });
+            
+            document.getElementById('removeCompleted').addEventListener('click', removeCompleted);
+            document.getElementById('toggleCompleted').addEventListener('click', toggleCompleted);
+            
+            // Initialize the UI
+            updateUI();
+            updateConsoleOutput();
+        });
+    </script>
+</body>
+</html>
